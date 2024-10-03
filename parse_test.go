@@ -43,6 +43,6 @@ func TestEnvHosts(t *testing.T) {
 	urls := EnvURLs("TEST_URLS")
 
 	if len(urls) != 10 {
-		t.Errorf("Error parsing addr: ", addr)
+		t.Errorf("Error parsing addr: %s", addr)
 	}
 }

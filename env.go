@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func EnvInt(env string, def int) int {
@@ -42,6 +43,51 @@ func EnvStringFatal(env string) string {
 		os.Exit(1)
 	}
 	return e
+}
+
+func EnvBool(env string, def bool) bool {
+	v := os.Getenv(env)
+
+	if v == "" {
+		return def
+	}
+
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return def
+	}
+
+	return b
+}
+
+func EnvDuration(env string, def time.Duration) time.Duration {
+	v := os.Getenv(env)
+
+	if v == "" {
+		return def
+	}
+
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return def
+	}
+
+	return d
+}
+
+func EnvFloat64(env string, def float64) float64 {
+	v := os.Getenv(env)
+
+	if v == "" {
+		return def
+	}
+
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return def
+	}
+
+	return f
 }
 
 func EnvURLs(env string) []string {
