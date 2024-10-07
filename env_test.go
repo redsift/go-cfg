@@ -33,6 +33,30 @@ func TestEnvInt(t *testing.T) {
 	}
 }
 
+func TestEnvInt64(t *testing.T) {
+	tests := []struct {
+		name     string
+		env      string
+		def      int64
+		envValue string
+		want     int64
+	}{
+		{"Default", "TEST_ENV_INT64", 42, "", 42},
+		{"ValidValue", "TEST_ENV_INT64", 0, "9223372036854775807", 9223372036854775807},
+		{"NegativeValue", "TEST_ENV_INT64", 0, "-9223372036854775808", -9223372036854775808},
+		{"InvalidValue", "TEST_ENV_INT64", 42, "not_a_number", 42},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv(tt.env, tt.envValue)
+			defer os.Unsetenv(tt.env)
+			if got := cfg.EnvInt64(tt.env, tt.def); got != tt.want {
+				t.Errorf("EnvInt64() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestEnvString(t *testing.T) {
 	tests := []struct {
 		name     string

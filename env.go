@@ -20,6 +20,21 @@ func EnvInt(env string, def int) int {
 	return i
 }
 
+func EnvInt64(env string, def int64) int64 {
+	s := os.Getenv(env)
+
+	if s == "" {
+		return def
+	}
+
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return def
+	}
+
+	return v
+}
+
 func EnvString(env string, def string) string {
 	e := os.Getenv(env)
 	if e == "" {
