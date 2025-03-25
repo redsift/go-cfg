@@ -1,0 +1,36 @@
+package dcfg
+
+import (
+	"reflect"
+	"strings"
+)
+
+// Type is a custom string alias used to represent a type as a predictable string.
+type Type string
+
+// TypeOf takes a value of any type and returns its predictable Type representation.
+// This generic function uses a workaround (wrapping the value in a slice) to retrieve the actual
+// type given. Without this, even if explicitly instantiated with an interface type, a concrete
+// type is returned by reflect.TypeOf.
+func TypeOf[T any](t T) Type {
+	return TypeOfReflect(
+		reflect.TypeOf([]T{t}).Elem(),
+	)
+}
+
+// TypeOfReflect returns a predictable type string for the given reflect.Type.
+func TypeOfReflect(t reflect.Type) Type {
+	switch t.Kind() {
+	case reflect.Pointer:
+		return TypeOfReflect(t.Elem())
+	case reflect.Array, reflect.Slice:
+		return TypeOfReflect(t.Elem()) + "_slice"
+	default:
+		name := t.Name()
+		if name == "" {
+			panic("cannot get type name")
+		}
+		pkgPath := strings.TrimPrefix(t.PkgPath(), "github.com/redsift/")
+		return Type(pkgPath + "/" + name)
+	}
+}
