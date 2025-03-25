@@ -8,10 +8,10 @@ import (
 )
 
 // Subscribe implements dcfg.Backend.
-func (b *Backend) Subscribe(ctx context.Context, type_ dcfg.Type, key dcfg.Key) (dcfg.Stream, error) {
+func (b *Backend) Subscribe(ctx context.Context, key dcfg.Key) (dcfg.Stream, error) {
 	stream := &Stream{ctx: ctx}
 
-	if err := b.withColl(ctx, type_, key, func(coll *mongo.Collection) error {
+	if err := b.withColl(ctx, key, func(coll *mongo.Collection) error {
 		in, err := coll.Watch(ctx, mongo.Pipeline{
 			{{Key: "$match", Value: b.filter(key)}},
 		})

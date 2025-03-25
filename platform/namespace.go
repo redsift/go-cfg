@@ -7,6 +7,6 @@ const (
 	KEY_SIFTS    = "sifts"
 )
 
-func Key(version dcfg.Version, key ...string) dcfg.Key {
-	return dcfg.NewKey(version, KEY_PLATFORM, key...)
+func SliceKey[T any](version dcfg.Version, key ...string) dcfg.Key {
+	return dcfg.NewKey[[]T](version, KEY_PLATFORM, key...)
 }

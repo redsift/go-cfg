@@ -8,13 +8,20 @@ import (
 // Type is a custom string alias used to represent a type as a predictable string.
 type Type string
 
-// TypeOf takes a value of any type and returns its predictable Type representation.
+// TypeOfValue takes a value of any type and returns its predictable Type representation.
 // This generic function uses a workaround (wrapping the value in a slice) to retrieve the actual
 // type given. Without this, even if explicitly instantiated with an interface type, a concrete
-// type is returned by reflect.TypeOf.
-func TypeOf[T any](t T) Type {
+// type is returned by reflect.TypeOfValue.
+func TypeOfValue[T any](t T) Type {
 	return TypeOfReflect(
 		reflect.TypeOf([]T{t}).Elem(),
+	)
+}
+
+// TypeOf is a convenience function to generate a type without a value.
+func TypeOf[T any]() Type {
+	return TypeOfReflect(
+		reflect.TypeOf([]T{}).Elem(),
 	)
 }
 

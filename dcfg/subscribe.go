@@ -11,8 +11,8 @@ type Stream interface {
 	Decode(any) error
 }
 
-func Subscribe[T any](ctx context.Context, b Backend, type_ Type, key Key, fn func(T, error) bool) error {
-	stream, err := b.Subscribe(ctx, type_, key)
+func Subscribe[T any](ctx context.Context, b Backend, key Key, fn func(T, error) bool) error {
+	stream, err := b.Subscribe(ctx, key)
 	if err != nil {
 		return err
 	}

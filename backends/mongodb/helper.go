@@ -19,8 +19,8 @@ type envelope[Value any] struct {
 	Value   Value  `json:"value"`
 }
 
-func (b *Backend) coll(ctx context.Context, type_ dcfg.Type, key dcfg.Key) (*mongo.Collection, error) {
-	collName := key.Elements[0] + "_" + mangleRE.ReplaceAllString(string(type_), "_")
+func (b *Backend) coll(ctx context.Context, key dcfg.Key) (*mongo.Collection, error) {
+	collName := key.Elements[0] + "_" + mangleRE.ReplaceAllString(string(key.Type), "_")
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -49,8 +49,8 @@ func (b *Backend) filter(key dcfg.Key) bson.D {
 	}
 }
 
-func (b *Backend) withColl(ctx context.Context, type_ dcfg.Type, key dcfg.Key, fn func(*mongo.Collection) error) error {
-	coll, err := b.coll(ctx, type_, key)
+func (b *Backend) withColl(ctx context.Context, key dcfg.Key, fn func(*mongo.Collection) error) error {
+	coll, err := b.coll(ctx, key)
 	if err != nil {
 		return err
 	}

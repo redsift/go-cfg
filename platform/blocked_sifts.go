@@ -9,7 +9,7 @@ import (
 
 const KEY_BLOCKED = "blocked"
 
-var BlockedSiftsV1Key = Key(1, KEY_SIFTS, KEY_BLOCKED)
+var BlockedSiftsV1Key = SliceKey[BlockedSiftVersion](1, KEY_SIFTS, KEY_BLOCKED)
 
 type BlockedSiftVersion struct {
 	GUID   siftjson.GUID
@@ -18,7 +18,8 @@ type BlockedSiftVersion struct {
 }
 
 func BlockedSifts(b dcfg.Backend) *dcfg.TypedSlice[BlockedSiftVersion] {
-	return dcfg.NewTypedSlice[BlockedSiftVersion](b, BlockedSiftsV1Key)
+	res, _ := dcfg.NewTypedSlice[BlockedSiftVersion](b, BlockedSiftsV1Key)
+	return res
 }
 
 func LoadBlockedSifts(ctx context.Context, b dcfg.Backend) (out []BlockedSiftVersion, _ error) {

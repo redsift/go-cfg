@@ -1,6 +1,9 @@
 package dcfg
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 // Slice abstracts a list of elements
 type Slice interface {
@@ -15,21 +18,22 @@ type Slice interface {
 }
 
 // NewTypedSlice creates a new TypedSlice
-func NewTypedSlice[T any](b Backend, key Key) *TypedSlice[T] {
-	type_ := TypeOf([]T{})
+func NewTypedSlice[T any](b Backend, key Key) (*TypedSlice[T], error) {
+	type_ := TypeOf[[]T]()
+	if key.Type != type_ {
+		return nil, fmt.Errorf("invalid type %q in Slice key, expected %q", key.Type, type_)
+	}
 	return &TypedSlice[T]{
 		backend: b,
 		key:     key,
-		type_:   type_,
-		slice:   b.Slice(type_, key),
-	}
+		slice:   b.Slice(key),
+	}, nil
 }
 
 // TypedSlice wraps a Slice implementation from a Backend and provides type-safety.
 type TypedSlice[T any] struct {
 	backend Backend
 	key     Key
-	type_   Type
 	slice   Slice
 }
 
@@ -49,7 +53,7 @@ func (t *TypedSlice[T]) Append(ctx context.Context, items ...T) error {
 
 // Load loads the whole slice
 func (t *TypedSlice[T]) Load(ctx context.Context) (out []T, _ error) {
-	err := t.backend.Load(ctx, t.type_, t.key, &out)
+	err := t.backend.Load(ctx, t.key, &out)
 	return out, err
 }
 

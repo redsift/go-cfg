@@ -25,9 +25,9 @@ type Backend struct {
 }
 
 // Load implements dcfg.Backend.
-func (b *Backend) Load(ctx context.Context, type_ dcfg.Type, key dcfg.Key, target any) error {
+func (b *Backend) Load(ctx context.Context, key dcfg.Key, target any) error {
 	var tmp envelope[bson.Raw]
-	if err := b.withColl(ctx, type_, key, func(coll *mongo.Collection) error {
+	if err := b.withColl(ctx, key, func(coll *mongo.Collection) error {
 		return coll.FindOne(ctx, b.filter(key)).Decode(&tmp)
 	}); err != nil {
 		return err
@@ -36,13 +36,13 @@ func (b *Backend) Load(ctx context.Context, type_ dcfg.Type, key dcfg.Key, targe
 }
 
 // Store implements dcfg.Backend.
-func (b *Backend) Store(ctx context.Context, type_ dcfg.Type, key dcfg.Key, value any) error {
+func (b *Backend) Store(ctx context.Context, key dcfg.Key, value any) error {
 	tmp := envelope[any]{
 		Key:     strings.Join(key.Elements, "/"),
 		Version: uint(key.Version),
 		Value:   value,
 	}
-	return b.withColl(ctx, type_, key, func(coll *mongo.Collection) error {
+	return b.withColl(ctx, key, func(coll *mongo.Collection) error {
 		_, err := coll.ReplaceOne(ctx, tmp, options.Replace().SetUpsert(true))
 		return err
 	})

@@ -9,14 +9,14 @@ import (
 )
 
 func TestTypeOf(t *testing.T) {
-	require.Equal(t, "go_dcfg_dcfg_testdata_SomeStruct", dcfg.TypeOf(testdata.SomeStruct{}))
-	require.Equal(t, "go_dcfg_dcfg_testdata_SomeStruct", dcfg.TypeOf(&testdata.SomeStruct{}))
+	require.Equal(t, "go_dcfg_dcfg_testdata_SomeStruct", dcfg.TypeOfValue(testdata.SomeStruct{}))
+	require.Equal(t, "go_dcfg_dcfg_testdata_SomeStruct", dcfg.TypeOfValue(&testdata.SomeStruct{}))
 
 	var tmp testdata.SomeInterface = &testdata.SomeStruct{}
-	require.Equal(t, "go_dcfg_dcfg_testdata_SomeInterface", dcfg.TypeOf(tmp))
-	require.Equal(t, "go_dcfg_dcfg_testdata_SomeInterface", dcfg.TypeOf[testdata.SomeInterface](&testdata.SomeStruct{}))
-	require.Equal(t, "go_dcfg_dcfg_testdata_SomeInterface", dcfg.TypeOf[testdata.SomeInterface](nil))
+	require.Equal(t, "go_dcfg_dcfg_testdata_SomeInterface", dcfg.TypeOfValue(tmp))
+	require.Equal(t, "go_dcfg_dcfg_testdata_SomeInterface", dcfg.TypeOfValue[testdata.SomeInterface](&testdata.SomeStruct{}))
+	require.Equal(t, "go_dcfg_dcfg_testdata_SomeInterface", dcfg.TypeOfValue[testdata.SomeInterface](nil))
 
-	require.Equal(t, "string_slice", dcfg.TypeOf([]string{"test"}))
-	require.Equal(t, "string_slice", dcfg.TypeOf([...]string{"test"}))
+	require.Equal(t, "string_slice", dcfg.TypeOfValue([]string{"test"}))
+	require.Equal(t, "string_slice", dcfg.TypeOfValue([...]string{"test"}))
 }
