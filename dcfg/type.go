@@ -30,14 +30,22 @@ func TypeOfReflect(t reflect.Type) Type {
 	switch t.Kind() {
 	case reflect.Pointer:
 		return TypeOfReflect(t.Elem())
+
 	case reflect.Array, reflect.Slice:
 		return TypeOfReflect(t.Elem()) + "_slice"
+
+	case reflect.Map:
+		return "map[" + TypeOfReflect(t.Key()) + "]" + TypeOfReflect(t.Elem())
+
 	default:
 		name := t.Name()
 		if name == "" {
 			panic("cannot get type name")
 		}
 		pkgPath := strings.TrimPrefix(t.PkgPath(), "github.com/redsift/")
-		return Type(pkgPath + "/" + name)
+		if pkgPath != "" {
+			pkgPath += "/"
+		}
+		return Type(pkgPath + name)
 	}
 }

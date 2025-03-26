@@ -12,6 +12,10 @@ Helper and type definitions abstracting dynamic configuration.
 
 Shared configuration types
 
-## platform.BlockedSiftVersion
+### platform.BlockedSiftVersion
 
 List of blocked Sift versions (by `siftjson.ID`).
+
+### platform.LabsSifts
+
+Map of `siftjson.GUID` to class.

@@ -11,7 +11,15 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func New(client *mongo.Client) dcfg.Backend {
+func New(uri string) (dcfg.Backend, error) {
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, err
+	}
+	return NewFromClient(client), nil
+}
+
+func NewFromClient(client *mongo.Client) dcfg.Backend {
 	return &Backend{
 		client:      client,
 		collections: map[string]*mongo.Collection{},
@@ -24,15 +32,29 @@ type Backend struct {
 	collections map[string]*mongo.Collection
 }
 
+// Delete implements dcfg.Backend.
+func (b *Backend) Delete(ctx context.Context, key dcfg.Key) error {
+	return b.withColl(ctx, key, func(coll *mongo.Collection) error {
+		_, err := coll.DeleteOne(ctx, b.filter(key))
+		return err
+	})
+}
+
 // Load implements dcfg.Backend.
 func (b *Backend) Load(ctx context.Context, key dcfg.Key, target any) error {
-	var tmp envelope[bson.Raw]
-	if err := b.withColl(ctx, key, func(coll *mongo.Collection) error {
-		return coll.FindOne(ctx, b.filter(key)).Decode(&tmp)
-	}); err != nil {
+	var tmp envelope[bson.RawValue]
+
+	if err := b.load(ctx, key, &tmp); err != nil {
 		return err
 	}
-	return bson.Unmarshal(tmp.Value, target)
+
+	return mapError(tmp.Value.Unmarshal(target))
+}
+
+func (b *Backend) load(ctx context.Context, key dcfg.Key, target any) error {
+	return b.withColl(ctx, key, func(coll *mongo.Collection) error {
+		return coll.FindOne(ctx, b.filter(key)).Decode(target)
+	})
 }
 
 // Store implements dcfg.Backend.
@@ -43,7 +65,12 @@ func (b *Backend) Store(ctx context.Context, key dcfg.Key, value any) error {
 		Value:   value,
 	}
 	return b.withColl(ctx, key, func(coll *mongo.Collection) error {
-		_, err := coll.ReplaceOne(ctx, tmp, options.Replace().SetUpsert(true))
+		_, err := coll.ReplaceOne(
+			ctx,
+			b.filter(key),
+			tmp,
+			options.Replace().SetUpsert(true),
+		)
 		return err
 	})
 }

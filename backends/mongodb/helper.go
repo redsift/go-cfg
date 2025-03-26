@@ -2,6 +2,8 @@ package mongodb
 
 import (
 	"context"
+	"errors"
+	"io"
 	"regexp"
 	"strings"
 
@@ -11,16 +13,20 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-var mangleRE = regexp.MustCompile("[^a-zA-Z0-9_]")
+// collectionMangleRE matches all characters that are not safe to use in a collection name
+var collectionMangleRE = regexp.MustCompile("[^a-zA-Z0-9_]")
 
+// envelope is used to wrap the value with the key fields.
 type envelope[Value any] struct {
 	Key     string `json:"key"`
 	Version uint   `json:"version"`
 	Value   Value  `json:"value"`
 }
 
+// coll derives a collection name from the key and ensures the collection is set up with the unique
+// index.
 func (b *Backend) coll(ctx context.Context, key dcfg.Key) (*mongo.Collection, error) {
-	collName := key.Elements[0] + "_" + mangleRE.ReplaceAllString(string(key.Type), "_")
+	collName := key.Elements[0] + "_" + collectionMangleRE.ReplaceAllString(string(key.Type), "_")
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -39,20 +45,36 @@ func (b *Backend) coll(ctx context.Context, key dcfg.Key) (*mongo.Collection, er
 		},
 		Options: options.Index().SetUnique(true),
 	})
-	return coll, err
+	return coll, mapError(err)
 }
 
+// filter returns the filter for the key
 func (b *Backend) filter(key dcfg.Key) bson.D {
 	return bson.D{
 		{Key: "key", Value: strings.Join(key.Elements, "/")},
-		{Key: "value", Value: uint(key.Version)},
+		{Key: "version", Value: uint(key.Version)},
 	}
 }
 
+// withColl calls the given func with the collection derived from the given key.
 func (b *Backend) withColl(ctx context.Context, key dcfg.Key, fn func(*mongo.Collection) error) error {
 	coll, err := b.coll(ctx, key)
 	if err != nil {
 		return err
 	}
-	return fn(coll)
+	return mapError(fn(coll))
+}
+
+// mapError maps mongo errors to dcfg errors
+func mapError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return dcfg.ErrNotFound
+	}
+	if errors.Is(err, io.EOF) {
+		return dcfg.ErrNotFound
+	}
+	return err
 }

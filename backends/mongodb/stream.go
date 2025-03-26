@@ -2,8 +2,10 @@ package mongodb
 
 import (
 	"context"
+	"strings"
 
 	"github.com/redsift/go-cfg/dcfg"
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
@@ -13,7 +15,13 @@ func (b *Backend) Subscribe(ctx context.Context, key dcfg.Key) (dcfg.Stream, err
 
 	if err := b.withColl(ctx, key, func(coll *mongo.Collection) error {
 		in, err := coll.Watch(ctx, mongo.Pipeline{
-			{{Key: "$match", Value: b.filter(key)}},
+			{{
+				Key: "$match",
+				Value: bson.D{
+					{Key: "fullDocument.key", Value: strings.Join(key.Elements, "/")},
+					{Key: "fullDocument.version", Value: uint(key.Version)},
+				},
+			}},
 		})
 		if err != nil {
 			return err
@@ -39,7 +47,17 @@ func (s *Stream) Close() error {
 
 // Decode implements dcfg.Stream.
 func (s *Stream) Decode(target any) error {
-	return s.in.Decode(target)
+	var tmp struct {
+		OperationType string
+		FullDocument  envelope[bson.RawValue]
+	}
+
+	// unwrap from event & envelope
+	if err := s.in.Decode(&tmp); err != nil {
+		return mapError(err)
+	}
+
+	return tmp.FullDocument.Value.Unmarshal(target)
 }
 
 // Next implements dcfg.Stream.

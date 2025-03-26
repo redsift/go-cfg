@@ -2,6 +2,7 @@ package dcfg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -53,7 +54,10 @@ func (t *TypedSlice[T]) Append(ctx context.Context, items ...T) error {
 
 // Load loads the whole slice
 func (t *TypedSlice[T]) Load(ctx context.Context) (out []T, _ error) {
-	err := t.backend.Load(ctx, t.key, &out)
+	err := t.slice.Load(ctx, &out)
+	if errors.Is(err, ErrNotFound) {
+		return nil, nil
+	}
 	return out, err
 }
 
