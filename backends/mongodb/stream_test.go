@@ -47,10 +47,10 @@ func TestStream(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, be.Store(context.TODO(), vKey, one))
+	require.NoError(t, be.Store(context.TODO(), vKey, nil, one))
 	requireUpdate(one)
 
-	require.NoError(t, be.Store(context.TODO(), vKey, two))
+	require.NoError(t, be.Store(context.TODO(), vKey, nil, two))
 	requireUpdate(two)
 
 	require.NoError(t, be.Delete(context.TODO(), vKey))

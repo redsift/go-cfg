@@ -14,11 +14,11 @@ func Typed[T any](b Backend, key Key) TypedValue[T] {
 	}
 }
 
-func (tv *TypedValue[T]) Load(ctx context.Context) (out T, err error) {
-	err = tv.backend.Load(ctx, tv.key, &out)
+func (tv *TypedValue[T]) Load(ctx context.Context) (meta Meta, out T, err error) {
+	meta, err = tv.backend.Load(ctx, tv.key, &out)
 	return
 }
 
-func (tv *TypedValue[T]) Store(ctx context.Context, value T) error {
-	return tv.backend.Store(ctx, tv.key, value)
+func (tv *TypedValue[T]) Store(ctx context.Context, meta *Meta, value T) error {
+	return tv.backend.Store(ctx, tv.key, meta, value)
 }

@@ -34,7 +34,8 @@ func TestMap(t *testing.T) {
 
 	// ensure value does not exist
 	var tmp any
-	require.ErrorIs(t, be.Load(context.TODO(), mKey, &tmp), dcfg.ErrNotFound)
+	_, err = be.Load(context.TODO(), mKey, &tmp)
+	require.ErrorIs(t, err, dcfg.ErrNotFound)
 
 	// set one item
 	require.NoError(t, m.SetKey(context.TODO(), oneGUID, one))

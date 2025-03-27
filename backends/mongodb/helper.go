@@ -18,9 +18,10 @@ var collectionMangleRE = regexp.MustCompile("[^a-zA-Z0-9_]")
 
 // envelope is used to wrap the value with the key fields.
 type envelope[Value any] struct {
-	Key     string `json:"key"`
-	Version uint   `json:"version"`
-	Value   Value  `json:"value"`
+	Key        string `json:"key"`
+	Version    uint   `json:"version"`
+	Value      Value  `json:"value"`
+	Generation uint   `json:"generation"`
 }
 
 // coll derives a collection name from the key and ensures the collection is set up with the unique

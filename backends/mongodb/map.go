@@ -38,7 +38,7 @@ func (m *Map) DelKey(ctx context.Context, key string) error {
 		Value: bson.D{{
 			Key: "value." + m.mangleKey(key),
 		}},
-	}}
+	}, incGeneration}
 
 	return m.backend.withColl(ctx, m.key, func(coll *mongo.Collection) error {
 		_, err := coll.UpdateOne(ctx, m.backend.filter(m.key), op)
@@ -87,7 +87,7 @@ func (m *Map) Load(ctx context.Context, target any) error {
 	}
 
 	// load data
-	if err := m.backend.Load(ctx, m.key, target); err != nil {
+	if _, err := m.backend.Load(ctx, m.key, target); err != nil {
 		return err
 	}
 
@@ -121,7 +121,7 @@ func (m *Map) SetKey(ctx context.Context, key string, value any) error {
 			Key:   "value." + m.mangleKey(key),
 			Value: value,
 		}},
-	}}
+	}, incGeneration}
 
 	return m.backend.withColl(ctx, m.key, func(coll *mongo.Collection) error {
 		_, err := coll.UpdateOne(ctx, m.backend.filter(m.key), op, options.UpdateOne().SetUpsert(true))
@@ -143,7 +143,7 @@ func (m *Map) Update(ctx context.Context, values map[string]any) error {
 			Key:   "value",
 			Value: tmp,
 		}},
-	}}
+	}, incGeneration}
 
 	return m.backend.withColl(ctx, m.key, func(coll *mongo.Collection) error {
 		_, err := coll.UpdateOne(ctx, m.backend.filter(m.key), op, options.UpdateOne().SetUpsert(true))

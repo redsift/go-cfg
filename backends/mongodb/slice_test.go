@@ -31,7 +31,8 @@ func TestSlice(t *testing.T) {
 
 	// ensure value does not exist
 	var tmp any
-	require.ErrorIs(t, be.Load(context.TODO(), sKey, &tmp), dcfg.ErrNotFound)
+	_, err = be.Load(context.TODO(), sKey, &tmp)
+	require.ErrorIs(t, err, dcfg.ErrNotFound)
 
 	// ensure ErrNotFound is mapped to empty value
 	_, err = slice.Load(context.TODO())

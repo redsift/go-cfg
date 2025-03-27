@@ -25,7 +25,7 @@ func connect(t *testing.T) dcfg.Backend {
 		uri = "mongodb://localhost:27017/?replicaSet=rs0"
 	}
 
-	be, err := mongodb.New(uri)
+	be, err := mongodb.New(uri, "dcfg")
 	require.NoError(t, err)
 	return be
 }
@@ -38,11 +38,11 @@ func TestBackend(t *testing.T) {
 	)
 
 	// should not exist
-	err := be.Load(context.TODO(), aKey, &v)
+	_, err := be.Load(context.TODO(), aKey, &v)
 	require.ErrorIs(t, err, dcfg.ErrNotFound)
 
 	// write
-	err = be.Store(context.TODO(), aKey, testdata{
+	err = be.Store(context.TODO(), aKey, nil, testdata{
 		Bool:   true,
 		Int:    123,
 		String: t.Name(),
@@ -50,16 +50,43 @@ func TestBackend(t *testing.T) {
 	require.NoError(t, err)
 
 	//read
-	err = be.Load(context.TODO(), aKey, &v)
+	meta, err := be.Load(context.TODO(), aKey, &v)
 	require.NoError(t, err)
 	require.Equal(t, true, v.Bool)
 	require.Equal(t, 123, v.Int)
 	require.Equal(t, t.Name(), v.String)
+	require.EqualValues(t, 1, meta.Generation)
+
+	// successful overwrite
+	err = be.Store(context.TODO(), aKey, &meta, testdata{
+		Bool:   false,
+		Int:    234,
+		String: "over",
+	})
+	require.NoError(t, err)
+	meta2, err := be.Load(context.TODO(), aKey, &v)
+	require.Equal(t, false, v.Bool)
+	require.Equal(t, 234, v.Int)
+	require.Equal(t, "over", v.String)
+	require.EqualValues(t, 2, meta2.Generation)
+
+	// unsuccessful overwrite
+	err = be.Store(context.TODO(), aKey, &meta, testdata{
+		Bool:   false,
+		Int:    345,
+		String: "not",
+	})
+	require.NoError(t, err)
+	meta3, err := be.Load(context.TODO(), aKey, &v)
+	require.Equal(t, false, v.Bool)
+	require.Equal(t, 234, v.Int)
+	require.Equal(t, "over", v.String)
+	require.EqualValues(t, 2, meta3.Generation)
 
 	// remove
 	require.NoError(t, be.Delete(context.TODO(), aKey))
 
 	// ensure not found error
-	err = be.Load(context.TODO(), aKey, &v)
+	_, err = be.Load(context.TODO(), aKey, &v)
 	require.ErrorIs(t, err, dcfg.ErrNotFound)
 }

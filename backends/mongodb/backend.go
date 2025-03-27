@@ -11,15 +11,15 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func New(uri string) (dcfg.Backend, error) {
+func New(uri string, db string) (dcfg.Backend, error) {
 	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, err
 	}
-	return NewFromClient(client), nil
+	return NewFromClient(client, db), nil
 }
 
-func NewFromClient(client *mongo.Client) dcfg.Backend {
+func NewFromClient(client *mongo.Client, db string) dcfg.Backend {
 	return &Backend{
 		client:      client,
 		collections: map[string]*mongo.Collection{},
@@ -41,14 +41,16 @@ func (b *Backend) Delete(ctx context.Context, key dcfg.Key) error {
 }
 
 // Load implements dcfg.Backend.
-func (b *Backend) Load(ctx context.Context, key dcfg.Key, target any) error {
+func (b *Backend) Load(ctx context.Context, key dcfg.Key, target any) (meta dcfg.Meta, _ error) {
 	var tmp envelope[bson.RawValue]
 
 	if err := b.load(ctx, key, &tmp); err != nil {
-		return err
+		return meta, err
 	}
 
-	return mapError(tmp.Value.Unmarshal(target))
+	meta.Generation = tmp.Generation
+
+	return meta, mapError(tmp.Value.Unmarshal(target))
 }
 
 func (b *Backend) load(ctx context.Context, key dcfg.Key, target any) error {
@@ -58,18 +60,28 @@ func (b *Backend) load(ctx context.Context, key dcfg.Key, target any) error {
 }
 
 // Store implements dcfg.Backend.
-func (b *Backend) Store(ctx context.Context, key dcfg.Key, value any) error {
-	tmp := envelope[any]{
-		Key:     strings.Join(key.Elements, "/"),
-		Version: uint(key.Version),
-		Value:   value,
+func (b *Backend) Store(ctx context.Context, key dcfg.Key, meta *dcfg.Meta, value any) error {
+	var (
+		tmp = envelope[any]{
+			Key:        strings.Join(key.Elements, "/"),
+			Version:    uint(key.Version),
+			Value:      value,
+			Generation: 1,
+		}
+		upsert = true
+		filter = b.filter(key)
+	)
+	if meta != nil {
+		filter = append(filter, bson.E{Key: "generation", Value: meta.Generation})
+		tmp.Generation = meta.Generation + 1
+		upsert = false
 	}
 	return b.withColl(ctx, key, func(coll *mongo.Collection) error {
 		_, err := coll.ReplaceOne(
 			ctx,
-			b.filter(key),
+			filter,
 			tmp,
-			options.Replace().SetUpsert(true),
+			options.Replace().SetUpsert(upsert),
 		)
 		return err
 	})
