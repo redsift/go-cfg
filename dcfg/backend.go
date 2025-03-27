@@ -4,6 +4,8 @@ import (
 	"context"
 )
 
+//go:generate mockgen -package dcfg -destination=mock.go . Backend,Slice,Map
+
 // Meta currently only contains the value generation used for optimistic locking
 type Meta struct {
 	Generation uint
