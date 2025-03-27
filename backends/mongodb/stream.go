@@ -7,6 +7,7 @@ import (
 	"github.com/redsift/go-cfg/dcfg"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 // Subscribe implements dcfg.Backend.
@@ -22,7 +23,7 @@ func (b *Backend) Subscribe(ctx context.Context, key dcfg.Key) (dcfg.Stream, err
 					{Key: "fullDocument.version", Value: uint(key.Version)},
 				},
 			}},
-		})
+		}, options.ChangeStream().SetFullDocument(options.UpdateLookup))
 		if err != nil {
 			return err
 		}
@@ -46,7 +47,7 @@ func (s *Stream) Close() error {
 }
 
 // Decode implements dcfg.Stream.
-func (s *Stream) Decode(target any) error {
+func (s *Stream) Decode(target any) (meta dcfg.Meta, _ error) {
 	var tmp struct {
 		OperationType string
 		FullDocument  envelope[bson.RawValue]
@@ -54,10 +55,12 @@ func (s *Stream) Decode(target any) error {
 
 	// unwrap from event & envelope
 	if err := s.in.Decode(&tmp); err != nil {
-		return mapError(err)
+		return meta, mapError(err)
 	}
 
-	return tmp.FullDocument.Value.Unmarshal(target)
+	meta.Generation = tmp.FullDocument.Generation
+
+	return meta, tmp.FullDocument.Value.Unmarshal(target)
 }
 
 // Next implements dcfg.Stream.

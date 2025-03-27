@@ -2,6 +2,7 @@ package mongodb_test
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -25,14 +26,20 @@ func TestStream(t *testing.T) {
 			String: "two",
 		}
 		update = make(chan testdata, 5)
+		gen    uint
 	)
 
-	require.NoError(t, dcfg.Subscribe(context.TODO(), be, vKey, func(d testdata, err error) bool {
+	require.NoError(t, dcfg.Subscribe(context.TODO(), be, vKey, func(d testdata, meta dcfg.Meta, err error) bool {
 		t.Log("update", d, err)
 
 		if err != nil {
 			panic(err)
 		}
+
+		if meta.Generation != gen+1 {
+			panic(fmt.Sprintf("invalid generation, expected=%d, received=%d", gen+1, meta.Generation))
+		}
+		gen = meta.Generation
 
 		update <- d
 		return true

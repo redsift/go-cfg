@@ -61,27 +61,47 @@ func (b *Backend) load(ctx context.Context, key dcfg.Key, target any) error {
 
 // Store implements dcfg.Backend.
 func (b *Backend) Store(ctx context.Context, key dcfg.Key, meta *dcfg.Meta, value any) error {
-	var (
-		tmp = envelope[any]{
-			Key:        strings.Join(key.Elements, "/"),
-			Version:    uint(key.Version),
-			Value:      value,
-			Generation: 1,
-		}
-		upsert = true
-		filter = b.filter(key)
-	)
-	if meta != nil {
-		filter = append(filter, bson.E{Key: "generation", Value: meta.Generation})
-		tmp.Generation = meta.Generation + 1
-		upsert = false
+	if meta == nil {
+		return b.overwrite(ctx, key, value)
 	}
+
+	tmp := envelope[any]{
+		Key:        strings.Join(key.Elements, "/"),
+		Version:    uint(key.Version),
+		Value:      value,
+		Generation: meta.Generation + 1,
+	}
+
 	return b.withColl(ctx, key, func(coll *mongo.Collection) error {
 		_, err := coll.ReplaceOne(
 			ctx,
-			filter,
+			append(
+				b.filter(key),
+				bson.E{Key: "generation", Value: meta.Generation},
+			),
 			tmp,
-			options.Replace().SetUpsert(upsert),
+		)
+		return err
+	})
+
+}
+
+func (b *Backend) overwrite(ctx context.Context, key dcfg.Key, value any) error {
+	op := bson.D{
+		{Key: "$set", Value: bson.D{
+			{Key: "key", Value: strings.Join(key.Elements, "/")},
+			{Key: "version", Value: key.Version},
+			{Key: "value", Value: value},
+		}},
+		incGeneration,
+	}
+
+	return b.withColl(ctx, key, func(coll *mongo.Collection) error {
+		_, err := coll.UpdateOne(
+			ctx,
+			b.filter(key),
+			op,
+			options.UpdateOne().SetUpsert(true),
 		)
 		return err
 	})

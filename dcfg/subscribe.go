@@ -8,10 +8,10 @@ import (
 type Stream interface {
 	Close() error
 	Next(context.Context) bool
-	Decode(any) error
+	Decode(any) (Meta, error)
 }
 
-func Subscribe[T any](ctx context.Context, b Backend, key Key, fn func(T, error) bool) error {
+func Subscribe[T any](ctx context.Context, b Backend, key Key, fn func(T, Meta, error) bool) error {
 	stream, err := b.Subscribe(ctx, key)
 	if err != nil {
 		return err
@@ -22,8 +22,8 @@ func Subscribe[T any](ctx context.Context, b Backend, key Key, fn func(T, error)
 
 		for stream.Next(ctx) {
 			var tmp T
-			err := stream.Decode(&tmp)
-			if !fn(tmp, err) {
+			meta, err := stream.Decode(&tmp)
+			if !fn(tmp, meta, err) {
 				return
 			}
 		}
