@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 )
 
 // Slice abstracts a list of elements
@@ -69,6 +70,61 @@ func (t *TypedSlice[T]) Store(ctx context.Context, items ...T) error {
 	}
 
 	return t.slice.Store(ctx, a...)
+}
+
+// Subscribe subscribes to updates on the store and calculates the diff
+func (t *TypedSlice[T]) Subscribe(ctx context.Context, compare func(T, T) int, update func(add, remove []T, err error) bool) error {
+	cur, err := t.Load(ctx)
+	if err != nil {
+		return nil
+	}
+
+	slices.SortFunc(cur, compare)
+	cur = slices.CompactFunc(cur, func(a, b T) bool {
+		return compare(a, b) == 0
+	})
+
+	return Subscribe[[]T](ctx, t.backend, t.key, func(updated []T, m Meta, err error) bool {
+		if err != nil {
+			return update(nil, nil, err)
+		}
+
+		slices.SortFunc(updated, compare)
+		updated = slices.CompactFunc(updated, func(a, b T) bool {
+			return compare(a, b) == 0
+		})
+
+		var (
+			added, removed []T
+			c, u           int
+		)
+
+		for c < len(cur) && u < len(updated) {
+			diff := compare(cur[c], updated[u])
+			if diff == 0 {
+				c++
+				u++
+			} else if diff > 0 {
+				added = append(added, updated[u])
+				u++
+			} else { // diff < 0
+				removed = append(removed, cur[c])
+				c++
+			}
+		}
+
+		if c < len(cur) {
+			removed = append(removed, cur[c:]...)
+		}
+
+		if u < len(updated) {
+			added = append(added, updated[u:]...)
+		}
+
+		cur = updated
+
+		return update(added, removed, nil)
+	})
 }
 
 // RemoveItems removes the given items from the slice
