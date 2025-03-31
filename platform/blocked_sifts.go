@@ -11,13 +11,15 @@ const KEY_BLOCKED = "blocked"
 
 var BlockedSiftsV1Key = SliceKey[BlockedSiftVersion](1, KEY_SIFTS, KEY_BLOCKED)
 
+type BlockedSiftsSlice = dcfg.TypedSlice[BlockedSiftVersion]
+
 type BlockedSiftVersion struct {
 	GUID   siftjson.GUID
 	ID     siftjson.ID
 	Reason string
 }
 
-func BlockedSifts(b dcfg.Backend) *dcfg.TypedSlice[BlockedSiftVersion] {
+func BlockedSifts(b dcfg.Backend) *BlockedSiftsSlice {
 	res, _ := dcfg.NewTypedSlice[BlockedSiftVersion](b, BlockedSiftsV1Key)
 	return res
 }
