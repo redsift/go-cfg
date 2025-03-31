@@ -16,6 +16,7 @@ type BlockedSiftsSlice = dcfg.TypedSlice[BlockedSiftVersion]
 type BlockedSiftVersion struct {
 	GUID   siftjson.GUID
 	ID     siftjson.ID
+	Hard   bool
 	Reason string
 }
 
