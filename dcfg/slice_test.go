@@ -11,7 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-func TestSliceSubscribe(t *testing.T) {
+func TestSliceSubscribeDiff(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	be := NewMockBackend(ctrl)
 	ms := NewMockSlice(ctrl)
@@ -53,7 +53,7 @@ func TestSliceSubscribe(t *testing.T) {
 		a, r []string
 		e    error
 	)
-	s.Subscribe(context.TODO(), strings.Compare, func(add []string, remove []string, err error) bool {
+	s.SubscribeDiff(context.TODO(), strings.Compare, func(add []string, remove []string, err error) bool {
 		defer wg.Done()
 		t.Log("add", add)
 		a = add

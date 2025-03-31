@@ -72,8 +72,15 @@ func (t *TypedSlice[T]) Store(ctx context.Context, items ...T) error {
 	return t.slice.Store(ctx, a...)
 }
 
-// Subscribe subscribes to updates on the store and calculates the diff
-func (t *TypedSlice[T]) Subscribe(ctx context.Context, compare func(T, T) int, update func(add, remove []T, err error) bool) error {
+// Subscribe subscribes to updates on the store
+func (t *TypedSlice[T]) Subscribe(ctx context.Context, update func(updated []T, err error) bool) error {
+	return Subscribe[[]T](ctx, t.backend, t.key, func(updated []T, m Meta, err error) bool {
+		return update(updated, err)
+	})
+}
+
+// SubscribeDiff subscribes to updates on the store and calculates the diff
+func (t *TypedSlice[T]) SubscribeDiff(ctx context.Context, compare func(T, T) int, update func(add, remove []T, err error) bool) error {
 	cur, err := t.Load(ctx)
 	if err != nil {
 		return nil
