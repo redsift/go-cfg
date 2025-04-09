@@ -27,6 +27,8 @@ github.com/redsift/go-jsontypes v0.1.0 h1:D2fix8dYkvZ6PxJ1Ff2RKgqdO7MrY0IMffVEsi
 github.com/redsift/go-jsontypes v0.1.0/go.mod h1:zP9UqPFRRO9Qe2TfsD2vNrYxRzHy1Br0lGjzBONy4uk=
 github.com/redsift/go-sandbox-rpc v0.2.0 h1:+61631V+xjCBWFxjnkSkMigsJsCGQtmwHPPc201LSQw=
 github.com/redsift/go-sandbox-rpc v0.2.0/go.mod h1:Eu9Hw8pdsncAGEX8O3BX0LMtvIDXpu0R3DFmqhvEHOo=
+github.com/redsift/go-siftjson v1.7.0-rc10 h1:oS+vLC+Uks0EuYDB0CKX1+baCQZA6oz9U2d1MrV+qJE=
+github.com/redsift/go-siftjson v1.7.0-rc10/go.mod h1:q9q+pMNndYq1SBVOVXXX0ys7cCueB2fiZZMuWBTgiaI=
 github.com/redsift/go-siftjson v1.7.0-rc8 h1:A9FsfJv/ikGq5sx23w0DZr/i8IPn7NzsEZ8cYtDPBr4=
 github.com/redsift/go-siftjson v1.7.0-rc8/go.mod h1:q9q+pMNndYq1SBVOVXXX0ys7cCueB2fiZZMuWBTgiaI=
 github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=

@@ -3,7 +3,7 @@ module github.com/redsift/go-cfg
 go 1.24
 
 require (
-	github.com/redsift/go-siftjson v1.7.0-rc8
+	github.com/redsift/go-siftjson v1.7.0-rc10
 	github.com/stretchr/testify v1.10.0
 	go.mongodb.org/mongo-driver/v2 v2.1.0
 	go.uber.org/mock v0.5.0
