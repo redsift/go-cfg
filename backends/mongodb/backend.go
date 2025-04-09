@@ -23,6 +23,7 @@ func NewFromClient(client *mongo.Client, db string) dcfg.Backend {
 	return &Backend{
 		client:      client,
 		collections: map[string]*mongo.Collection{},
+		dbName:      db,
 	}
 }
 
@@ -30,6 +31,7 @@ type Backend struct {
 	client      *mongo.Client
 	lock        sync.Mutex
 	collections map[string]*mongo.Collection
+	dbName      string
 }
 
 // Delete implements dcfg.Backend.
