@@ -14,6 +14,7 @@ var BlockedAccountssV1Key = SliceKey[BlockedAccount](1, KEY_ACCOUNTS, KEY_BLOCKE
 type BlockedAccountsSlice = dcfg.TypedSlice[BlockedAccount]
 
 type BlockedAccount struct {
+	GUID    siftjson.GUID
 	Account siftjson.AccountID
 	Reason  string
 }
