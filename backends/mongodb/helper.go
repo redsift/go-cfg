@@ -37,7 +37,7 @@ func (b *Backend) coll(ctx context.Context, key dcfg.Key) (*mongo.Collection, er
 		return coll, nil
 	}
 
-	coll = b.client.Database("dcfg").Collection(key.Elements[0] + "_")
+	coll = b.client.Database(b.dbName).Collection(key.Elements[0] + "_")
 	indexes := coll.Indexes()
 	_, err := indexes.CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{
