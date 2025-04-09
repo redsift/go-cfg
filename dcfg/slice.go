@@ -20,7 +20,7 @@ type Slice interface {
 }
 
 // NewTypedSlice creates a new TypedSlice
-func NewTypedSlice[T any](b Backend, key Key) (*TypedSlice[T], error) {
+func NewTypedSlice[T any](b Backend, key Key, compare func(T, T) int) (*TypedSlice[T], error) {
 	type_ := TypeOf[[]T]()
 	if key.Type != type_ {
 		return nil, fmt.Errorf("invalid type %q in Slice key, expected %q", key.Type, type_)
@@ -29,6 +29,7 @@ func NewTypedSlice[T any](b Backend, key Key) (*TypedSlice[T], error) {
 		backend: b,
 		key:     key,
 		slice:   b.Slice(key),
+		cmp:     compare,
 	}, nil
 }
 
@@ -37,6 +38,7 @@ type TypedSlice[T any] struct {
 	backend Backend
 	key     Key
 	slice   Slice
+	cmp     func(T, T) int
 }
 
 // Append adds an item to the slice
@@ -80,15 +82,15 @@ func (t *TypedSlice[T]) Subscribe(ctx context.Context, update func(updated []T, 
 }
 
 // SubscribeDiff subscribes to updates on the store and calculates the diff
-func (t *TypedSlice[T]) SubscribeDiff(ctx context.Context, compare func(T, T) int, update func(add, remove []T, err error) bool) error {
+func (t *TypedSlice[T]) SubscribeDiff(ctx context.Context, update func(add, remove []T, err error) bool) error {
 	cur, err := t.Load(ctx)
 	if err != nil {
 		return nil
 	}
 
-	slices.SortFunc(cur, compare)
+	slices.SortFunc(cur, t.cmp)
 	cur = slices.CompactFunc(cur, func(a, b T) bool {
-		return compare(a, b) == 0
+		return t.cmp(a, b) == 0
 	})
 
 	return Subscribe[[]T](ctx, t.backend, t.key, func(updated []T, m Meta, err error) bool {
@@ -96,9 +98,9 @@ func (t *TypedSlice[T]) SubscribeDiff(ctx context.Context, compare func(T, T) in
 			return update(nil, nil, err)
 		}
 
-		slices.SortFunc(updated, compare)
+		slices.SortFunc(updated, t.cmp)
 		updated = slices.CompactFunc(updated, func(a, b T) bool {
-			return compare(a, b) == 0
+			return t.cmp(a, b) == 0
 		})
 
 		var (
@@ -107,7 +109,7 @@ func (t *TypedSlice[T]) SubscribeDiff(ctx context.Context, compare func(T, T) in
 		)
 
 		for c < len(cur) && u < len(updated) {
-			diff := compare(cur[c], updated[u])
+			diff := t.cmp(cur[c], updated[u])
 			if diff == 0 {
 				c++
 				u++

@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"strings"
 
 	"github.com/redsift/go-cfg/dcfg"
 	"github.com/redsift/go-siftjson"
@@ -20,7 +21,15 @@ type BlockedAccount struct {
 }
 
 func BlockedAccounts(b dcfg.Backend) *BlockedAccountsSlice {
-	res, _ := dcfg.NewTypedSlice[BlockedAccount](b, BlockedSiftsV1Key)
+	res, _ := dcfg.NewTypedSlice[BlockedAccount](b, BlockedSiftsV1Key, func(a, b BlockedAccount) int {
+		if diff := strings.Compare(string(a.GUID), string(b.GUID)); diff != 0 {
+			return diff
+		}
+		if diff := strings.Compare(string(a.Account), string(b.Account)); diff != 0 {
+			return diff
+		}
+		return 0
+	})
 	return res
 }
 

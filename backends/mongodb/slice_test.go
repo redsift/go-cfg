@@ -3,6 +3,7 @@ package mongodb_test
 import (
 	"context"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,7 +27,21 @@ func TestSlice(t *testing.T) {
 		}
 	)
 
-	slice, err := dcfg.NewTypedSlice[testdata](be, sKey)
+	slice, err := dcfg.NewTypedSlice[testdata](be, sKey, func(a, b testdata) int {
+		if diff := a.Int - b.Int; diff != 0 {
+			return diff
+		}
+		if diff := strings.Compare(a.String, b.String); diff != 0 {
+			return diff
+		}
+		if a.Bool && !b.Bool {
+			return 1
+		}
+		if !a.Bool && b.Bool {
+			return -1
+		}
+		return 0
+	})
 	require.NoError(t, err)
 
 	// ensure value does not exist

@@ -16,7 +16,7 @@ func TestSliceSubscribeDiff(t *testing.T) {
 	be := NewMockBackend(ctrl)
 	ms := NewMockSlice(ctrl)
 	be.EXPECT().Slice(gomock.Any()).Return(ms)
-	s, err := NewTypedSlice[string](be, NewKey[[]string](1, "test", t.Name()))
+	s, err := NewTypedSlice[string](be, NewKey[[]string](1, "test", t.Name()), strings.Compare)
 	require.NoError(t, err)
 
 	ms.EXPECT().
@@ -53,7 +53,7 @@ func TestSliceSubscribeDiff(t *testing.T) {
 		a, r []string
 		e    error
 	)
-	s.SubscribeDiff(context.TODO(), strings.Compare, func(add []string, remove []string, err error) bool {
+	s.SubscribeDiff(context.TODO(), func(add []string, remove []string, err error) bool {
 		defer wg.Done()
 		t.Log("add", add)
 		a = add
