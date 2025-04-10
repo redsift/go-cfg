@@ -1,11 +1,15 @@
 package platform
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/redsift/go-cfg/dcfg"
 	"github.com/redsift/go-siftjson"
@@ -21,13 +25,23 @@ type SiftFlag uint
 
 const (
 	SIFT_FLAG_INTERNAL SiftFlag = 1 << iota
-	SIFT_FLAG_VERBOSE_TAGS
+	SIFT_FLAG_TEST
 )
 
 type SiftMetadata struct {
-	GUID  siftjson.GUID `json:"guid"`
-	Name  string        `json:"name"`
-	Flags SiftFlag      `json:"flags"`
+	GUID        siftjson.GUID     `json:"guid"`
+	Name        string            `json:"name"`
+	DisplayName string            `json:"display_name,omitempty"`
+	Flags       SiftFlag          `json:"flags"`
+	Tags        map[string]string `json:"tags,omitempty"`
+}
+
+func (m SiftMetadata) StatsdTags() []string {
+	tags := make([]string, 0, len(m.Tags))
+	for _, key := range slices.Sorted(maps.Keys(m.Tags)) {
+		tags = append(tags, key+":"+m.Tags[key])
+	}
+	return tags
 }
 
 func NewSiftMetadataMap(b dcfg.Backend) *SiftMetadataMap {
@@ -35,16 +49,79 @@ func NewSiftMetadataMap(b dcfg.Backend) *SiftMetadataMap {
 	return (*SiftMetadataMap)(res)
 }
 
-func SiftMetadataServeHTTP(prefix string, m *SiftMetadataMap) http.Handler {
+type SiftMetadataService struct {
+	lock  sync.Mutex
+	data  atomic.Pointer[map[siftjson.GUID]*atomic.Pointer[SiftMetadata]]
+	store *SiftMetadataMap
+}
+
+func NewSiftMetadataService(ctx context.Context, store *SiftMetadataMap) (*SiftMetadataService, error) {
+	s := &SiftMetadataService{
+		store: store,
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if err := store.Subscribe(ctx, s.subscriptionHandler); err != nil {
+		return nil, err
+	}
+
+	data, err := s.store.Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	m := map[siftjson.GUID]*atomic.Pointer[SiftMetadata]{}
+	for guid, meta := range data {
+		m[guid] = new(atomic.Pointer[SiftMetadata])
+		m[guid].Store(&meta)
+	}
+
+	s.data.Store(&m)
+
+	return s, nil
+}
+
+func (s *SiftMetadataService) Get(guid siftjson.GUID) (p *atomic.Pointer[SiftMetadata], ok bool) {
+	p, ok = (*s.data.Load())[guid]
+	s.lock.Lock()
+	return
+}
+
+func (s *SiftMetadataService) Set(ctx context.Context, guid siftjson.GUID, m SiftMetadata) error {
+	data := *s.data.Load()
+	if _, ok := data[guid]; !ok {
+		s.lock.Lock()
+		defer s.lock.Unlock()
+		data = *s.data.Load()
+		if _, ok := data[guid]; !ok {
+			next := maps.Clone(data)
+			p := new(atomic.Pointer[SiftMetadata])
+			p.Store(&m)
+			next[guid] = p
+			s.data.Store(&next)
+		}
+	}
+
+	return s.store.SetKey(ctx, guid, m)
+}
+
+func (s *SiftMetadataService) MakeHTTPHandler(prefix string) http.Handler {
 	prefix = "/" + strings.Trim(prefix, "/")
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+prefix+"/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		data, err := m.Load(r.Context())
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+
+		var (
+			m    = *s.data.Load()
+			data = make(map[siftjson.GUID]SiftMetadata, len(m))
+		)
+
+		for guid, p := range m {
+			data[guid] = *p.Load()
 		}
+
 		json.NewEncoder(w).Encode(data)
 	})
 
@@ -55,15 +132,15 @@ func SiftMetadataServeHTTP(prefix string, m *SiftMetadataMap) http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		data, err := m.GetKey(r.Context(), siftjson.GUID(guid))
-		if err != nil {
-			if errors.Is(err, dcfg.ErrNotFound) {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			w.WriteHeader(http.StatusInternalServerError)
+
+		p, ok := (*s.data.Load())[siftjson.GUID(guid)]
+		data := p.Load()
+
+		if !ok || data == nil {
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+
 		json.NewEncoder(w).Encode(data)
 	})
 
@@ -87,29 +164,71 @@ func SiftMetadataServeHTTP(prefix string, m *SiftMetadataMap) http.Handler {
 			return
 		}
 
-		err := m.SetKey(r.Context(), siftjson.GUID(guid), content)
-		if err != nil {
+		if err := s.Set(r.Context(), siftjson.GUID(guid), content); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	mux.HandleFunc("POST "+prefix+"/{guid}/verbose", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT "+prefix+"/{guid}/tags/{key}/{value}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "application/json")
-		var verbose bool
-		if _, err := fmt.Fscanf(r.Body, "%v", &verbose); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
 
 		guid := r.PathValue("guid")
 		if len(guid) != 50 {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		key := r.PathValue("key")
+		if len(key) < 2 || len(key) > 20 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		value := r.PathValue("value")
+		if len(key) < 2 || len(key) > 100 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 
-		data, err := m.GetKey(r.Context(), siftjson.GUID(guid))
+		p, ok := (*s.data.Load())[siftjson.GUID(guid)]
+		data := p.Load()
+
+		if !ok || data == nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		if old, ok := data.Tags[key]; !ok && value != old {
+			if data.Tags == nil {
+				data.Tags = make(map[string]string)
+			}
+			data.Tags[key] = value
+
+			if err := s.Set(r.Context(), siftjson.GUID(guid), *data); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
+		json.NewEncoder(w).Encode(data)
+	})
+
+	mux.HandleFunc("DELETE "+prefix+"/{guid}/tags/{key}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "application/json")
+
+		guid := r.PathValue("guid")
+		if len(guid) != 50 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		key := r.PathValue("key")
+		if len(key) < 2 || len(key) > 20 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		data, err := s.store.GetKey(r.Context(), siftjson.GUID(guid))
 		if err != nil {
 			if errors.Is(err, dcfg.ErrNotFound) {
 				w.WriteHeader(http.StatusNotFound)
@@ -119,17 +238,10 @@ func SiftMetadataServeHTTP(prefix string, m *SiftMetadataMap) http.Handler {
 			return
 		}
 
-		changed := false
-		if verbose {
-			changed = data.Flags&SIFT_FLAG_VERBOSE_TAGS == 0
-			data.Flags |= SIFT_FLAG_VERBOSE_TAGS
-		} else {
-			changed = data.Flags&SIFT_FLAG_VERBOSE_TAGS != 0
-			data.Flags &= ^SIFT_FLAG_VERBOSE_TAGS
-		}
+		if _, ok := data.Tags[key]; ok {
+			delete(data.Tags, key)
 
-		if changed {
-			if err := m.SetKey(r.Context(), siftjson.GUID(guid), data); err != nil {
+			if err := s.store.SetKey(r.Context(), siftjson.GUID(guid), data); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -147,7 +259,7 @@ func SiftMetadataServeHTTP(prefix string, m *SiftMetadataMap) http.Handler {
 			return
 		}
 
-		err := m.DelKey(r.Context(), siftjson.GUID(guid))
+		err := s.store.DelKey(r.Context(), siftjson.GUID(guid))
 		if err != nil {
 			if errors.Is(err, dcfg.ErrNotFound) {
 				w.WriteHeader(http.StatusNotFound)
@@ -160,4 +272,36 @@ func SiftMetadataServeHTTP(prefix string, m *SiftMetadataMap) http.Handler {
 	})
 
 	return mux
+}
+
+func (s *SiftMetadataService) subscriptionHandler(
+	updated map[siftjson.GUID]SiftMetadata,
+	removed []siftjson.GUID,
+	err error,
+) bool {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	m := *s.data.Load()
+	next := maps.Clone(m)
+
+	for guid, meta := range updated {
+		p, ok := m[guid]
+		if !ok {
+			p = new(atomic.Pointer[SiftMetadata])
+			next[guid] = p
+		}
+		p.Store(&meta)
+	}
+
+	for _, guid := range removed {
+		if p := next[guid]; p != nil {
+			p.Store(nil)
+		}
+		delete(next, guid)
+	}
+
+	s.data.Store(&next)
+
+	return true
 }
