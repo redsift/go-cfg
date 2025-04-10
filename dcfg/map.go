@@ -3,6 +3,9 @@ package dcfg
 import (
 	"context"
 	"fmt"
+	"maps"
+	"reflect"
+	"sync"
 )
 
 // Map defines an interface to interact with a string value map.
@@ -70,4 +73,51 @@ func (t *TypedMap[K, V]) Update(ctx context.Context, values map[K]V) error {
 		tmp[string(k)] = v
 	}
 	return t.m.Update(ctx, tmp)
+}
+
+// Subscribe subscribes to updates on the store
+func (t *TypedMap[K, V]) Subscribe(ctx context.Context, update func(updated map[K]V, removed []K, err error) bool) (err error) {
+	var (
+		lock sync.Mutex
+		data map[K]V
+	)
+
+	lock.Lock()
+	defer lock.Unlock()
+
+	if err = Subscribe[map[K]V](ctx, t.backend, t.key, func(newValues map[K]V, m Meta, err error) bool {
+		lock.Lock()
+		defer lock.Unlock()
+
+		if err != nil {
+			return update(nil, nil, err)
+		}
+
+		updated := make(map[K]V, max(len(data), len(newValues)))
+
+		for k, v := range newValues {
+			old, existed := data[k]
+			if existed && reflect.DeepEqual(v, old) {
+				continue
+			}
+			updated[k] = v
+		}
+
+		removed := make([]K, 0, max(0, len(data)-len(newValues)))
+		for k := range maps.Keys(data) {
+			_, exists := newValues[k]
+			if !exists {
+				removed = append(removed, k)
+			}
+		}
+
+		data = newValues
+
+		return update(updated, removed, err)
+	}); err != nil {
+		return err
+	}
+
+	data, err = t.Load(ctx)
+	return
 }
