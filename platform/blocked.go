@@ -62,7 +62,9 @@ func NewBlockedService(
 	opts ...BlockedServiceOption,
 ) *BlockedService {
 	return &BlockedService{
-		onError: func(error) bool { return true },
+		onError:         func(error) bool { return true },
+		blockedAccounts: blockedAccounts,
+		blockedSifts:    blockedSifts,
 	}
 }
 
