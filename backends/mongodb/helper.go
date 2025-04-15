@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/redsift/go-cfg/dcfg"
@@ -24,10 +25,16 @@ type envelope[Value any] struct {
 	Generation uint   `json:"generation"`
 }
 
+// collectionName derives a collection name from the key
+func (b *Backend) collectionName(key dcfg.Key) string {
+	return key.Elements[0] + "_v" + strconv.Itoa(int(key.Version)) + "_" +
+		collectionMangleRE.ReplaceAllString(string(key.Type), "_")
+}
+
 // coll derives a collection name from the key and ensures the collection is set up with the unique
 // index.
 func (b *Backend) coll(ctx context.Context, key dcfg.Key) (*mongo.Collection, error) {
-	collName := key.Elements[0] + "_" + collectionMangleRE.ReplaceAllString(string(key.Type), "_")
+	collName := b.collectionName(key)
 
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -37,7 +44,7 @@ func (b *Backend) coll(ctx context.Context, key dcfg.Key) (*mongo.Collection, er
 		return coll, nil
 	}
 
-	coll = b.client.Database(b.dbName).Collection(key.Elements[0] + "_")
+	coll = b.client.Database(b.dbName).Collection(collName)
 	indexes := coll.Indexes()
 	_, err := indexes.CreateOne(ctx, mongo.IndexModel{
 		Keys: bson.D{

@@ -1,5 +1,10 @@
 package dcfg
 
+import (
+	"strconv"
+	"strings"
+)
+
 // Version is used to enforce key versioning
 type Version uint
 
@@ -13,4 +18,11 @@ type Key struct {
 // NewKey creates a Key from version, type, app and additional key parts
 func NewKey[T any](v Version, app string, additional ...string) Key {
 	return Key{v, TypeOf[T](), append([]string{app}, additional...)}
+}
+
+func (k Key) String() string {
+	return strings.Join(append([]string{
+		k.Elements[0],
+		"v" + strconv.Itoa(int(k.Version)),
+	}, k.Elements[1:]...), "/") + ":" + string(k.Type)
 }
