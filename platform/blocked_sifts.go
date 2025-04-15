@@ -22,7 +22,7 @@ type BlockedSiftVersion struct {
 }
 
 func BlockedSifts(b dcfg.Backend) *BlockedSiftsSlice {
-	res, _ := dcfg.NewTypedSlice[BlockedSiftVersion](b, BlockedSiftsV1Key, func(a, b BlockedSiftVersion) int {
+	res, err := dcfg.NewTypedSlice[BlockedSiftVersion](b, BlockedSiftsV1Key, func(a, b BlockedSiftVersion) int {
 		if diff := strings.Compare(string(a.GUID), string(b.GUID)); diff != 0 {
 			return diff
 		}
@@ -31,6 +31,9 @@ func BlockedSifts(b dcfg.Backend) *BlockedSiftsSlice {
 		}
 		return 0
 	})
+	if err != nil {
+		panic("error in key type: " + err.Error())
+	}
 	return res
 }
 

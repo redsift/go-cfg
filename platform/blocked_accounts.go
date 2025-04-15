@@ -21,7 +21,7 @@ type BlockedAccount struct {
 }
 
 func BlockedAccounts(b dcfg.Backend) *BlockedAccountsSlice {
-	res, _ := dcfg.NewTypedSlice[BlockedAccount](b, BlockedSiftsV1Key, func(a, b BlockedAccount) int {
+	res, err := dcfg.NewTypedSlice(b, BlockedAccountssV1Key, func(a, b BlockedAccount) int {
 		if diff := strings.Compare(string(a.GUID), string(b.GUID)); diff != 0 {
 			return diff
 		}
@@ -30,6 +30,9 @@ func BlockedAccounts(b dcfg.Backend) *BlockedAccountsSlice {
 		}
 		return 0
 	})
+	if err != nil {
+		panic("error in key type: " + err.Error())
+	}
 	return res
 }
 
